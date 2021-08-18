@@ -49,28 +49,27 @@ def create_address(payload, person_id):
     person = Person.query.get(person_id)
     if person is None:
         abort(404, description="person does not exist")
-    # If there are no AddressSegment records present for the person, we can go
-    # ahead and create with no additional logic.
-    elif len(person.address_segments) == 0:
-        address_segment = AddressSegment(
-            street_one=payload.get("street_one"),
-            street_two=payload.get("street_two"),
-            city=payload.get("city"),
-            state=payload.get("state"),
-            zip_code=payload.get("zip_code"),
-            start_date=payload.get("start_date"),
-            person_id=person_id,
-        )
 
-        db.session.add(address_segment)
-        db.session.commit()
-        db.session.refresh(address_segment)
-    else:
-        # TODO: Implementation
-        # If there are one or more existing AddressSegments, create a new AddressSegment
-        # that begins on the start_date provided in the API request and continues
-        # into the future. If the start_date provided is not greater than most recent
-        # address segment start_date, raise an Exception.
-        raise NotImplementedError()
+    new_address = AddressSegment(
+        street_one=payload.get("street_one"),
+        street_two=payload.get("street_two"),
+        city=payload.get("city"),
+        state=payload.get("state"),
+        zip_code=payload.get("zip_code"),
+        start_date=payload.get("start_date"),
+        end_date=payload.get("end_date"),
+        person_id=person_id,
+    )
+    # new_address.validate
 
-    return jsonify(AddressSchema().dump(address_segment))
+    if len(person.address_segments) > 0:
+        latest_address = person.address_segments[-1]
+        if new_address.start_date <= latest_address.start_date:
+            # abort(404, description="invalid address start date")
+            raise Exception("invalid address start date")
+
+    db.session.add(new_address)
+    db.session.commit()
+    db.session.refresh(new_address)
+
+    return jsonify(AddressSchema().dump(new_address))
